@@ -7,9 +7,12 @@
 (define-constant ERR-REPAYMENT-FAILED (err u106))
 (define-constant ERR-UNSUPPORTED-ASSET (err u107))
 (define-constant ERR-COLLATERAL-TRANSFER-FAILED (err u108))
+(define-constant ERR-LOAN-NOT-OVERDUE (err u109))
+(define-constant ERR-LOAN-ALREADY-LIQUIDATED (err u110))
 
 (define-data-var next-loan-id uint u1)
 (define-data-var contract-owner principal tx-sender)
+(define-constant LIQUIDATION-GRACE-PERIOD u144)
 
 (define-map loans 
   { loan-id: uint }
@@ -239,4 +242,46 @@
 
 (define-read-only (get-asset-vault-info (loan-id uint))
   (map-get? asset-vault { loan-id: loan-id })
+)
+
+(define-public (liquidate-loan (loan-id uint) (collateral-asset <sip-010-trait>))
+  (let (
+    (loan (unwrap! (map-get? loans { loan-id: loan-id }) ERR-LOAN-NOT-FOUND))
+    (vault-info (unwrap! (map-get? asset-vault { loan-id: loan-id }) ERR-LOAN-NOT-FOUND))
+    (loan-deadline (+ (get start-height loan) (get duration loan)))
+    (liquidation-deadline (+ loan-deadline LIQUIDATION-GRACE-PERIOD))
+  )
+    (asserts! (is-eq (get status loan) "ACTIVE") ERR-LOAN-NOT-ACTIVE)
+    (asserts! (is-eq tx-sender (unwrap! (get lender loan) ERR-NOT-AUTHORIZED)) ERR-NOT-AUTHORIZED)
+    (asserts! (>= stacks-block-height liquidation-deadline) ERR-LOAN-NOT-OVERDUE)
+    
+    (try! (as-contract (contract-call? 
+      collateral-asset
+      transfer 
+      (get amount vault-info) 
+      tx-sender 
+      (unwrap! (get lender loan) ERR-NOT-AUTHORIZED) 
+      none)))
+    
+    (map-delete asset-vault { loan-id: loan-id })
+    (map-set loans
+      { loan-id: loan-id }
+      (merge loan { status: "LIQUIDATED" })
+    )
+    
+    (ok true)
+  )
+)
+
+(define-read-only (is-loan-liquidatable (loan-id uint))
+  (let (
+    (loan (unwrap! (map-get? loans { loan-id: loan-id }) ERR-LOAN-NOT-FOUND))
+    (loan-deadline (+ (get start-height loan) (get duration loan)))
+    (liquidation-deadline (+ loan-deadline LIQUIDATION-GRACE-PERIOD))
+  )
+    (ok (and 
+      (is-eq (get status loan) "ACTIVE")
+      (>= stacks-block-height liquidation-deadline)
+    ))
+  )
 )
