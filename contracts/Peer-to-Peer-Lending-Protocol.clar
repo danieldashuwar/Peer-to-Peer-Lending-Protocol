@@ -9,6 +9,8 @@
 (define-constant ERR-COLLATERAL-TRANSFER-FAILED (err u108))
 (define-constant ERR-LOAN-NOT-OVERDUE (err u109))
 (define-constant ERR-LOAN-ALREADY-LIQUIDATED (err u110))
+(define-constant ERR-INVALID-TRANSFER (err u111))
+(define-constant ERR-TRANSFER-TO-SELF (err u112))
 
 (define-data-var next-loan-id uint u1)
 (define-data-var contract-owner principal tx-sender)
@@ -282,6 +284,35 @@
     (ok (and 
       (is-eq (get status loan) "ACTIVE")
       (>= stacks-block-height liquidation-deadline)
+    ))
+  )
+)
+
+(define-public (transfer-loan (loan-id uint) (new-lender principal))
+  (let (
+    (loan (unwrap! (map-get? loans { loan-id: loan-id }) ERR-LOAN-NOT-FOUND))
+    (current-lender (unwrap! (get lender loan) ERR-NOT-AUTHORIZED))
+  )
+    (asserts! (is-eq tx-sender current-lender) ERR-NOT-AUTHORIZED)
+    (asserts! (or (is-eq (get status loan) "ACTIVE") (is-eq (get status loan) "PENDING")) ERR-INVALID-TRANSFER)
+    (asserts! (not (is-eq current-lender new-lender)) ERR-TRANSFER-TO-SELF)
+    
+    (map-set loans
+      { loan-id: loan-id }
+      (merge loan { lender: (some new-lender) })
+    )
+    
+    (ok true)
+  )
+)
+
+(define-read-only (is-loan-transferable (loan-id uint))
+  (let (
+    (loan (unwrap! (map-get? loans { loan-id: loan-id }) ERR-LOAN-NOT-FOUND))
+  )
+    (ok (and 
+      (is-some (get lender loan))
+      (or (is-eq (get status loan) "ACTIVE") (is-eq (get status loan) "PENDING"))
     ))
   )
 )
