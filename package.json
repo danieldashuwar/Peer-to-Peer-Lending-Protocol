@@ -1,0 +1,32 @@
+{
+  "name": "peer-to-peer-lending-protocol",
+  "version": "1.0.0", 
+  "description": "A decentralized peer-to-peer lending protocol on Stacks blockchain",
+  "main": "index.js",
+  "scripts": {
+    "test": "clarinet test",
+    "check": "clarinet check",
+    "console": "clarinet console",
+    "lint": "echo 'No linting configured'",
+    "typecheck": "clarinet check"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/danieldashuwar/Peer-to-Peer-Lending-Protocol"
+  },
+  "keywords": [
+    "stacks",
+    "clarity",
+    "blockchain",
+    "defi",
+    "lending",
+    "p2p",
+    "smart-contracts"
+  ],
+  "author": "danieldashuwar",
+  "license": "MIT",
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

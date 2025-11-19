@@ -1,0 +1,15 @@
+[project]
+name = 'peer-to-peer-lending-protocol'
+description = 'A decentralized peer-to-peer lending protocol on Stacks'
+authors = []
+telemetry = false
+cache_dir = './.clarinet'
+
+[contracts.lending-pool]
+path = 'contracts/lending-pool.clar'
+
+[contracts.reputation-system] 
+path = 'contracts/reputation-system.clar'
+
+[[project.requirements]]
+contract_id = 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-10-ft-standard'
