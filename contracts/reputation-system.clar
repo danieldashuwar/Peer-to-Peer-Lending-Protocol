@@ -8,6 +8,9 @@
 (define-constant ERR-INVALID-RATING (err u203))
 (define-constant ERR-ALREADY-RATED (err u204))
 (define-constant ERR-SELF-RATING (err u205))
+(define-constant ERR-FREEZE-NOT-ALLOWED (err u206))
+(define-constant ERR-ALREADY-FROZEN (err u207))
+(define-constant ERR-NOT-FROZEN (err u208))
 
 ;; Data variables
 (define-data-var contract-owner principal tx-sender)
@@ -88,6 +91,17 @@
   }
 )
 
+(define-map freeze-state
+  principal
+  {
+    is-frozen: bool,
+    frozen-at: uint,
+    frozen-score: uint,
+    freeze-reason: uint,
+    freeze-duration: uint
+  }
+)
+
 ;; Read-only functions
 
 (define-read-only (get-user-reputation (user principal))
@@ -104,6 +118,24 @@
 
 (define-read-only (get-peer-rating (rater principal) (ratee principal))
   (map-get? peer-ratings { rater: rater, ratee: ratee })
+)
+
+(define-read-only (get-freeze-state (user principal))
+  (map-get? freeze-state user)
+)
+
+(define-read-only (is-reputation-frozen (user principal))
+  (match (map-get? freeze-state user)
+    freeze-data
+    (if (get is-frozen freeze-data)
+      (if (< (- block-height (get frozen-at freeze-data)) (get freeze-duration freeze-data))
+        true
+        false
+      )
+      false
+    )
+    false
+  )
 )
 
 (define-read-only (calculate-reputation-score (user principal))
@@ -301,6 +333,50 @@
       (err ERR-INVALID-SCORE)
     )
     (err ERR-USER-NOT-FOUND)
+  )
+)
+
+(define-public (freeze-reputation (target-user principal) (reason uint) (duration uint))
+  (let (
+    (caller-data (map-get? user-reputation tx-sender))
+    (target-data (map-get? user-reputation target-user))
+    (freeze-key target-user)
+    (current-score (match (calculate-reputation-score target-user)
+      score score
+      u500
+    ))
+  )
+    (asserts! (is-some caller-data) ERR-USER-NOT-FOUND)
+    (asserts! (is-some target-data) ERR-USER-NOT-FOUND)
+    (asserts! (is-none (map-get? freeze-state freeze-key)) ERR-ALREADY-FROZEN)
+    
+    (map-set freeze-state freeze-key
+      {
+        is-frozen: true,
+        frozen-at: block-height,
+        frozen-score: current-score,
+        freeze-reason: reason,
+        freeze-duration: duration
+      }
+    )
+    (ok true)
+  )
+)
+
+(define-public (unfreeze-reputation (target-user principal))
+  (let ((freeze-key target-user))
+    (asserts! (is-some (map-get? freeze-state freeze-key)) ERR-NOT-FROZEN)
+    
+    (map-set freeze-state freeze-key
+      {
+        is-frozen: false,
+        frozen-at: u0,
+        frozen-score: u0,
+        freeze-reason: u0,
+        freeze-duration: u0
+      }
+    )
+    (ok true)
   )
 )
 
